@@ -2,6 +2,8 @@
 
 A tiny [Pi](https://github.com/badlogic/pi-mono) package that customizes which skills are visible to the model while preserving manual `/skill:name` use.
 
+Credit to [robzolkos](https://github.com/robzolkos/pi-disable-model-skill-invocation) for the extension that this was based on.
+
 ## What it does
 
 Pi supports `disable-model-invocation: true` in individual skill frontmatter. This extension lets you apply the same effect globally and per project without editing skill files:
@@ -50,12 +52,6 @@ Use the extension CLI flag to see which skills are hidden from model invocation 
 pi -p --list-disabled-invocations
 ```
 
-When testing the package locally:
-
-```bash
-pi -p -e . --list-disabled-invocations
-```
-
 Use print mode (`-p`) for this one-shot listing command so Pi does not start the interactive TUI. This avoids terminal cleanup races with other extensions that run on startup, such as terminal theme switchers.
 
 The output includes skills hidden by this allow-list configuration and skills with native `disable-model-invocation: true` frontmatter.
@@ -81,19 +77,6 @@ Then reload Pi:
 ```text
 /reload
 ```
-
-## Migrating from `pi-disable-model-skill-invocation`
-
-```bash
-pi remove git:github.com/travisp/pi-disable-model-skill-invocation
-pi install git:github.com/travisp/pi-custom-skill-invocation
-```
-
-Existing `skill-invocation.json` config files can stay where they are.
-
-## Package layout
-
-This is a standard Pi package with one extension under `extensions/`.
 
 ## Notes
 
