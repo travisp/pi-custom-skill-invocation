@@ -1,7 +1,7 @@
 {
-  "name": "pi-disable-model-skill-invocation",
+  "name": "pi-custom-skill-invocation",
   "version": "0.1.0",
-  "description": "Pi extension that globally hides skills from the model while preserving /skill:name.",
+  "description": "Pi extension that customizes which skills are visible to the model while preserving /skill:name.",
   "type": "module",
   "license": "MIT",
   "keywords": ["pi-package", "pi-extension", "pi", "skills"],
