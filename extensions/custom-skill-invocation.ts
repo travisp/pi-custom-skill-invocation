@@ -1,9 +1,18 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { formatSkillsForPrompt, getAgentDir, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import {
+	DefaultResourceLoader,
+	formatSkillsForPrompt,
+	getAgentDir,
+	SettingsManager,
+	type ExtensionAPI,
+	type ResourceDiagnostic,
+	type Skill,
+} from "@mariozechner/pi-coding-agent";
 
 const CONFIG_FILE_NAME = "skill-invocation.json";
+const LIST_DISABLED_INVOCATIONS_FLAG = "list-disabled-invocations";
 
 interface SkillInvocationConfig {
 	/** Skill names to expose to the model. */
@@ -21,6 +30,26 @@ interface SkillInvocationConfig {
  * - project: <cwd>/.pi/skill-invocation.json, also checked in parent directories
  */
 export default function customSkillInvocation(pi: ExtensionAPI) {
+	pi.registerFlag(LIST_DISABLED_INVOCATIONS_FLAG, {
+		description: "List skills hidden from model invocation by skill-invocation config",
+		type: "boolean",
+		default: false,
+	});
+
+	pi.on("session_start", async (_event, ctx) => {
+		if (pi.getFlag(LIST_DISABLED_INVOCATIONS_FLAG) !== true) {
+			return undefined;
+		}
+
+		await printDisabledInvocations(ctx.cwd);
+
+		if (ctx.hasUI) {
+			ctx.shutdown();
+		} else {
+			process.exitCode = 0;
+		}
+	});
+
 	pi.on("before_agent_start", async (event) => {
 		const skills = event.systemPromptOptions.skills ?? [];
 		const currentSkillBlock = formatSkillsForPrompt(skills);
@@ -36,6 +65,61 @@ export default function customSkillInvocation(pi: ExtensionAPI) {
 			systemPrompt: event.systemPrompt.replace(currentSkillBlock, nextSkillBlock),
 		};
 	});
+}
+
+async function printDisabledInvocations(cwd: string): Promise<void> {
+	const agentDir = getAgentDir();
+	const resourceLoader = new DefaultResourceLoader({
+		cwd,
+		agentDir,
+		settingsManager: SettingsManager.create(cwd, agentDir),
+	});
+	await resourceLoader.reload();
+
+	const { skills, diagnostics } = resourceLoader.getSkills();
+	for (const diagnostic of diagnostics) {
+		printDiagnostic(diagnostic);
+	}
+
+	const allowedNames = loadAllowedSkillNames(cwd);
+	const disabledSkills = skills
+		.filter((skill) => skill.disableModelInvocation || !allowedNames.has(skill.name))
+		.sort((a, b) => a.name.localeCompare(b.name));
+
+	if (disabledSkills.length === 0) {
+		console.log("No disabled skill invocations.");
+		return;
+	}
+
+	console.log(`Disabled skill invocations (${disabledSkills.length}):`);
+	for (const skill of disabledSkills) {
+		console.log(`- ${skill.name} (${disabledReason(skill, allowedNames)})`);
+		console.log(`  ${displayPath(cwd, skill.filePath)}`);
+	}
+}
+
+function disabledReason(skill: Skill, allowedNames: Set<string>): string {
+	if (skill.disableModelInvocation) {
+		return "disable-model-invocation frontmatter";
+	}
+	if (!allowedNames.has(skill.name)) {
+		return "not allow-listed";
+	}
+	return "hidden";
+}
+
+function printDiagnostic(diagnostic: ResourceDiagnostic): void {
+	const prefix = diagnostic.type === "error" ? "Error" : "Warning";
+	const path = diagnostic.path ? ` (${diagnostic.path})` : "";
+	console.error(`${prefix}: ${diagnostic.message}${path}`);
+}
+
+function displayPath(cwd: string, filePath: string): string {
+	const relativePath = relative(cwd, filePath);
+	if (!relativePath || relativePath.startsWith("..") || isAbsolute(relativePath)) {
+		return filePath;
+	}
+	return relativePath;
 }
 
 function loadAllowedSkillNames(cwd: string): Set<string> {

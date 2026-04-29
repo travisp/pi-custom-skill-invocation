@@ -42,6 +42,24 @@ Project config is discovered from the current working directory upward, so neste
 
 If no allow-list entry matches a skill, it is omitted from `<available_skills>` and remains manual-only.
 
+## Listing disabled invocations
+
+Use the extension CLI flag to see which skills are hidden from model invocation for the current directory:
+
+```bash
+pi -p --list-disabled-invocations
+```
+
+When testing the package locally:
+
+```bash
+pi -p -e . --list-disabled-invocations
+```
+
+Use print mode (`-p`) for this one-shot listing command so Pi does not start the interactive TUI. This avoids terminal cleanup races with other extensions that run on startup, such as terminal theme switchers.
+
+The output includes skills hidden by this allow-list configuration and skills with native `disable-model-invocation: true` frontmatter.
+
 ## Why this package exists
 
 Sometimes you want skills to be **manual-only** at the workflow level, but you do not want to add frontmatter to every skill one by one.
